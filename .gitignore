@@ -15,9 +15,18 @@
 *.dylib
 
 # Executables
+Module.symvers
 *.exe
 *.out
 *.app
 *.i*86
 *.x86_64
 *.hex
+*.cmd
+*.order
+*.mod.c
+.cproject
+.project
+.tmp_versions
+.tmp_version
+

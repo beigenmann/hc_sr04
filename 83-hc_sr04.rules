@@ -1,0 +1,1 @@
+KERNEL=="hc_sr04*", GROUP="tty"  MODE="0760"
