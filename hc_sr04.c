@@ -149,12 +149,14 @@ static int __init hc_sr04_init(void) /* Constructor */
 
 static void __exit hc_sr04_cleanup(void)
 {
+	unsigned int irq_num;
 	cdev_del(&c_dev);
 	device_destroy(cl, first);
 	class_destroy(cl);
 //	class_unregister(&hc_sr04_drv);
 	unregister_chrdev_region(first, 1);
-	free_irq(ECHO, NULL);
+	irq_num = gpio_to_irq( ECHO);
+	free_irq(irq_num, NULL);
 	gpio_free(TRIGGER);
 	gpio_free(ECHO);
 	printk(KERN_INFO "hc_sr04: unregistered\n");
