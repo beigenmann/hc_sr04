@@ -34,6 +34,9 @@ static unsigned int Echo[HC_SR04_PARAM_COUNT] __initdata;
 static unsigned int Trigger[HC_SR04_PARAM_COUNT] __initdata;
 static unsigned int echocount __initdata;
 static unsigned int triggercount __initdata;
+static unsigned int _count;
+static unsigned int _Echo[HC_SR04_PARAM_COUNT];
+static unsigned int _Trigger[HC_SR04_PARAM_COUNT];
 
 #define BUS_PARM_DESC \
         " config -> gpioa,gpiob"
@@ -94,14 +97,18 @@ static irqreturn_t echo_isr(int irq, void *data) {
 
 static int __init hc_sr04_init(void) /* Constructor */
 {
-	int status;
+	int status,i;
 	unsigned int irq_num;
 	if(echocount == 0 && triggercount == 0) {
-
+		echocount = 1;
+		triggercount = 1;
+		Echo[0] = ECHO;
+		Trigger[0] = TRIGGER;
 	}
 	if(echocount != triggercount) {
 		return -1;
 	}
+	_count = echocount;
 	if (alloc_chrdev_region(&first, 0, 1, "hc_sr04") < 0) {
 		return -1;
 	}
@@ -121,44 +128,50 @@ static int __init hc_sr04_init(void) /* Constructor */
 		unregister_chrdev_region(first, 1);
 		return -1;
 	}
-	printk(KERN_INFO "Successfully requested ECHO IRQ # %d\n", ECHO);
+//	printk(KERN_INFO "Successfully requested ECHO IRQ # %d\n", ECHO);
+	for(i = 0; i <_count;i++) {
+		_Trigger[i] = Trigger[i];
+		_Echo[i] = Echo[i];
+		status = gpio_request_one(Trigger[i], GPIOF_OUT_INIT_LOW, "TRIGGER");
 
-	status = gpio_request_one(TRIGGER, GPIOF_OUT_INIT_LOW, "TRIGGER");
+		if (status) {
+			printk(KERN_ERR "Unable to request GPIOs TRIGGER: %d\n", status);
+			return status;
+		}
 
-	if (status) {
-		printk(KERN_ERR "Unable to request GPIOs TRIGGER: %d\n", status);
-		return status;
+		status = gpio_request_one(Echo[i] , GPIOF_IN, "ECHO");
+
+		if (status) {
+			printk(KERN_ERR "Unable to request GPIOs ECHO: %d\n", status);
+			return status;
+		}
+		irq_num = gpio_to_irq( Echo[i] );
+		status = request_irq(irq_num, echo_isr, IRQF_TRIGGER_RISING | IRQF_DISABLED, "ECHO", NULL);
+
+		if(status) {
+			printk(KERN_ERR "Unable to request IRQ: %d\n", status);
+			return -1;
+		}
 	}
 
-	status = gpio_request_one(ECHO, GPIOF_IN, "ECHO");
-
-	if (status) {
-		printk(KERN_ERR "Unable to request GPIOs ECHO: %d\n", status);
-		return status;
-	}
-	irq_num = gpio_to_irq( ECHO);
-	status = request_irq(irq_num, echo_isr, IRQF_TRIGGER_RISING | IRQF_DISABLED, "ECHO", NULL);
-
-	if(status) {
-		printk(KERN_ERR "Unable to request IRQ: %d\n", status);
-		return -1;
-	}
 	printk(KERN_INFO "hc_sr04:  registered");
 	return 0; // Non-zero return means that the module couldn't be loaded.
 }
 
 static void __exit hc_sr04_cleanup(void)
 {
-	unsigned int irq_num;
+	unsigned int irq_num,i;
 	cdev_del(&c_dev);
 	device_destroy(cl, first);
 	class_destroy(cl);
-//	class_unregister(&hc_sr04_drv);
 	unregister_chrdev_region(first, 1);
-	irq_num = gpio_to_irq( ECHO);
-	free_irq(irq_num, NULL);
-	gpio_free(TRIGGER);
-	gpio_free(ECHO);
+	for(i = 0; i <_count;i++) {
+		irq_num = gpio_to_irq(_Echo[i]);
+		free_irq(irq_num, NULL);
+		gpio_free(_Trigger[i]);
+		gpio_free(_Echo[i]);
+	}
+
 	printk(KERN_INFO "hc_sr04: unregistered\n");
 }
 
