@@ -135,21 +135,21 @@ static int __init hc_sr04_init(void) /* Constructor */
 		status = gpio_request_one(Trigger[i], GPIOF_OUT_INIT_LOW, "TRIGGER");
 
 		if (status) {
-			printk(KERN_ERR "Unable to request GPIOs TRIGGER: %d\n", status);
+			printk(KERN_ERR "Unable to request GPIOs TRIGGER %d: %d\n",_Trigger[i] , status);
 			return status;
 		}
 
 		status = gpio_request_one(Echo[i] , GPIOF_IN, "ECHO");
 
 		if (status) {
-			printk(KERN_ERR "Unable to request GPIOs ECHO: %d\n", status);
+			printk(KERN_ERR "Unable to request GPIOs ECHO %d: %d\n",_Echo[i], status);
 			return status;
 		}
 		irq_num = gpio_to_irq( Echo[i] );
 		status = request_irq(irq_num, echo_isr, IRQF_TRIGGER_RISING | IRQF_DISABLED, "ECHO", NULL);
 
 		if(status) {
-			printk(KERN_ERR "Unable to request IRQ: %d\n", status);
+			printk(KERN_ERR "Unable to request IRQ %d: %d\n", irq_num, status);
 			return -1;
 		}
 	}
