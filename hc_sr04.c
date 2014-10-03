@@ -60,7 +60,7 @@ static ssize_t hc_sr04_read(struct file *f, char __user *buf, size_t
 	printk(KERN_INFO "Driver: read()\n");
 	flag = 'n';
 	gpio_set_value(TRIGGER, HIGH);
-	msleep(5);
+	udelay(10);
 	gpio_set_value(TRIGGER, LOW);
 	start_time = current_kernel_time();
 	wait_event_interruptible_timeout(queue, flag != 'n',100);
