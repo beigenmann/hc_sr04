@@ -23,7 +23,7 @@ static DECLARE_WAIT_QUEUE_HEAD( queue);
 static dev_t first; // Global variable for the first device number
 static struct cdev c_dev; // Global variable for the character device structure
 static struct class *cl; // Global variable for the device class
-static char flag = 'n';
+static volatile char flag = 'n';
 struct timespec end_time;
 struct timespec start_time;
 #define BUS_PARAM_REQUIRED      1
@@ -62,10 +62,7 @@ static ssize_t hc_sr04_read(struct file *f, char __user *buf, size_t
 	gpio_set_value(TRIGGER, HIGH);
 	udelay(10);
 	gpio_set_value(TRIGGER, LOW);
-	start_time = current_kernel_time();
-	wait_event_interruptible_timeout(queue, flag != 'n',100);
-	//timeeleapsed = end_time.tv_nsec - start_time.tv_nsec;
-	end_time = timespec_sub(end_time,start_time);
+	wait_event_interruptible_timeout(queue, flag == 'y',5);
 	printk(KERN_INFO "End Driver: read()\n");
 	if(flag == 'y') {
 		ret = snprintf(buf, len, "ALT %zd\n", end_time.tv_nsec);
@@ -89,9 +86,23 @@ static struct file_operations fops = { .owner = THIS_MODULE, .open =
  * The interrupt service routine called on button presses
  */
 static irqreturn_t echo_isr(int irq, void *data) {
-	end_time = current_kernel_time();
-	flag = 'y';
-	wake_up_interruptible(&queue);
+        gpio_set_value(DEBUGPIN, HIGH);
+        udelay(10);
+        gpio_set_value(DEBUGPIN, LOW);
+	if(flag == 'n')
+	{
+		start_time = current_kernel_time();
+                flag = 's';
+	}
+        else{
+	       if(flag == 's'){
+		end_time = current_kernel_time();
+                end_time = timespec_sub(end_time,start_time);
+
+                flag = 'y';
+		wake_up_interruptible(&queue);
+		}
+	}
 	return IRQ_HANDLED;
 }
 
@@ -128,6 +139,8 @@ static int __init hc_sr04_init(void) /* Constructor */
 		unregister_chrdev_region(first, 1);
 		return -1;
 	}
+        status = gpio_request_one(DEBUGPIN, GPIOF_OUT_INIT_LOW, "DEBUG");
+ 
 //	printk(KERN_INFO "Successfully requested ECHO IRQ # %d\n", ECHO);
 	for(i = 0; i <_count;i++) {
 		_Trigger[i] = Trigger[i];
@@ -146,7 +159,7 @@ static int __init hc_sr04_init(void) /* Constructor */
 			return status;
 		}
 		irq_num = gpio_to_irq( Echo[i] );
-		status = request_irq(irq_num, echo_isr, IRQF_TRIGGER_RISING | IRQF_DISABLED, "ECHO", NULL);
+		status = request_irq(irq_num, echo_isr, IRQF_TRIGGER_RISING |IRQF_TRIGGER_FALLING | IRQF_DISABLED, "ECHO", NULL);
 
 		if(status) {
 			printk(KERN_ERR "Unable to request IRQ %d: %d\n", irq_num, status);
