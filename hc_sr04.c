@@ -62,7 +62,7 @@ static ssize_t hc_sr04_read(struct file *f, char __user *buf, size_t
 	gpio_set_value(TRIGGER, HIGH);
 	udelay(10);
 	gpio_set_value(TRIGGER, LOW);
-	wait_event_interruptible_timeout(queue, flag == 'y',5);
+	wait_event_interruptible_timeout(queue, flag == 'y',20);
 	printk(KERN_INFO "End Driver: read()\n");
 	if(flag == 'y') {
 		ret = snprintf(buf, len, "ALT %zd\n", end_time.tv_nsec);
@@ -86,17 +86,20 @@ static struct file_operations fops = { .owner = THIS_MODULE, .open =
  * The interrupt service routine called on button presses
  */
 static irqreturn_t echo_isr(int irq, void *data) {
+#ifdef DEBUGPIN
         gpio_set_value(DEBUGPIN, HIGH);
         udelay(10);
         gpio_set_value(DEBUGPIN, LOW);
+#endif
 	if(flag == 'n')
 	{
+		getnstimeofday (&start_time); 
 		start_time = current_kernel_time();
                 flag = 's';
 	}
         else{
 	       if(flag == 's'){
-		end_time = current_kernel_time();
+		getnstimeofday (&end_time); 
                 end_time = timespec_sub(end_time,start_time);
 
                 flag = 'y';
@@ -139,8 +142,9 @@ static int __init hc_sr04_init(void) /* Constructor */
 		unregister_chrdev_region(first, 1);
 		return -1;
 	}
+#ifdef DEBUGPIN 
         status = gpio_request_one(DEBUGPIN, GPIOF_OUT_INIT_LOW, "DEBUG");
- 
+#endif 
 //	printk(KERN_INFO "Successfully requested ECHO IRQ # %d\n", ECHO);
 	for(i = 0; i <_count;i++) {
 		_Trigger[i] = Trigger[i];
