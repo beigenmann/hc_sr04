@@ -24,7 +24,7 @@ static dev_t first; // Global variable for the first device number
 static struct cdev c_dev; // Global variable for the character device structure
 static struct class *cl; // Global variable for the device class
 volatile unsigned long time_elapsed;
-volatile unsigned long time_start;
+struct timespec time_start;
 #define BUS_PARAM_REQUIRED      1
 #define HC_SR04_PARAM_COUNT         2
 #define BUS_COUNT_MAX           2
@@ -102,6 +102,7 @@ static void trigger_timer_func(unsigned long data) {
  */
 static irqreturn_t echo_isr(int irq, void *data) {
 	int value;
+	struct timespec end_time;
 #ifdef DEBUGPIN
 	gpio_set_value(DEBUGPIN, HIGH);
 	udelay(10);
@@ -109,9 +110,10 @@ static irqreturn_t echo_isr(int irq, void *data) {
 #endif
 	value = gpio_get_value(ECHO);
 	if (value == 0) {
-		time_elapsed = jiffies - time_start;
+		getrawmonotonic(&end_time);
+		time_elapsed = end_time.tv_nsec - time_start.tv_nsec;
 	} else {
-		time_start = jiffies;
+		getrawmonotonic(&time_start);
 	}
 	return IRQ_HANDLED;
 }
