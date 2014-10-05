@@ -12,7 +12,7 @@
 #include <linux/interrupt.h>
 #include <linux/wait.h>
 #include <linux/sched.h>
-
+#include <linux/jiffies.h>
 #include "hc_sr04.h"
 
 MODULE_LICENSE("GPL");
@@ -23,9 +23,8 @@ static DECLARE_WAIT_QUEUE_HEAD( queue);
 static dev_t first; // Global variable for the first device number
 static struct cdev c_dev; // Global variable for the character device structure
 static struct class *cl; // Global variable for the device class
-static volatile char flag = 'n';
-struct timespec end_time;
-struct timespec start_time;
+volatile unsigned long time_elapsed;
+volatile unsigned long time_start;
 #define BUS_PARAM_REQUIRED      1
 #define HC_SR04_PARAM_COUNT         2
 #define BUS_COUNT_MAX           2
@@ -57,22 +56,24 @@ static int hc_sr04_close(struct inode *i, struct file *f) {
 static ssize_t hc_sr04_read(struct file *f, char __user *buf, size_t
 		len, loff_t *off) {
 	ssize_t ret;
-	printk(KERN_INFO "Driver: read()\n");
-	flag = 'n';
-	gpio_set_value(TRIGGER, HIGH);
-	udelay(10);
-	gpio_set_value(TRIGGER, LOW);
-	wait_event_interruptible_timeout(queue, flag == 'y',20);
-	printk(KERN_INFO "End Driver: read()\n");
-	if(flag == 'y') {
-		ret = snprintf(buf, len, "ALT %zd\n", end_time.tv_nsec);
-	}
-	else {
-		ret = snprintf(buf, len, "Timed out\n");
-	}
+//	printk(KERN_INFO "Driver: read()\n");
+//	flag = 'n';
+//	gpio_set_value(TRIGGER, HIGH);
+//	udelay(10);
+//	gpio_set_value(TRIGGER, LOW);
+//	wait_event_interruptible_timeout(queue, flag == 'y',20);
+//	printk(KERN_INFO "End Driver: read()\n");
+//	if(flag == 'y') {
+//		ret = snprintf(buf, len, "ALT %zd\n", time_elapsed);
+//	}
+//	else {
+//		ret = snprintf(buf, len, "Timed out\n");
+//	}
+	ret = snprintf(buf, len, "ALT %zd\n", time_elapsed);
 	*off += ret;
 	return ret;
 }
+
 static ssize_t hc_sr04_write(struct file *f, const char __user *buf,
 		size_t len, loff_t *off) {
 	printk(KERN_INFO "Driver: write()\n");
@@ -86,26 +87,32 @@ static struct file_operations fops = { .owner = THIS_MODULE, .open =
  * The interrupt service routine called on button presses
  */
 static irqreturn_t echo_isr(int irq, void *data) {
+	int value;
 #ifdef DEBUGPIN
-        gpio_set_value(DEBUGPIN, HIGH);
-        udelay(10);
-        gpio_set_value(DEBUGPIN, LOW);
+	gpio_set_value(DEBUGPIN, HIGH);
+	udelay(10);
+	gpio_set_value(DEBUGPIN, LOW);
 #endif
-	if(flag == 'n')
-	{
-		getnstimeofday (&start_time); 
-		start_time = current_kernel_time();
-                flag = 's';
+	value = gpio_get_value(ECHO);
+	if(value == 0){
+		time_elapsed = jiffies - time_start;
+	}else{
+		time_start = jiffies;
 	}
-        else{
-	       if(flag == 's'){
-		getnstimeofday (&end_time); 
-                end_time = timespec_sub(end_time,start_time);
 
-                flag = 'y';
-		wake_up_interruptible(&queue);
-		}
-	}
+//	if (flag == 'n') {
+//		getnstimeofday(&start_time);
+//		start_time = current_kernel_time();
+//		flag = 's';
+//	} else {
+//		if (flag == 's') {
+//			getnstimeofday(&end_time);
+//			end_time = timespec_sub(end_time, start_time);
+//
+//			flag = 'y';
+//			wake_up_interruptible(&queue);
+//		}
+//	}
 	return IRQ_HANDLED;
 }
 
@@ -143,7 +150,7 @@ static int __init hc_sr04_init(void) /* Constructor */
 		return -1;
 	}
 #ifdef DEBUGPIN 
-        status = gpio_request_one(DEBUGPIN, GPIOF_OUT_INIT_LOW, "DEBUG");
+	status = gpio_request_one(DEBUGPIN, GPIOF_OUT_INIT_LOW, "DEBUG");
 #endif 
 //	printk(KERN_INFO "Successfully requested ECHO IRQ # %d\n", ECHO);
 	for(i = 0; i <_count;i++) {
