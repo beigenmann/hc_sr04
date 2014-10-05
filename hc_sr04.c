@@ -93,10 +93,10 @@ static void trigger_timer_func(unsigned long data) {
 	//printk(KERN_INFO "%s\n", __func__);
 
 	/* schedule next execution */
-	trigger_timer.expires = jiffies + (1 * HZ); 		// 1 sec.
+	trigger_timer.expires 8= jiffies + (1 * HZ)/10); 		// 1 sec.
 	add_timer(&trigger_timer);
 }
-
+1
 /*
  * The interrupt service routine called on button presses
  */
@@ -113,20 +113,6 @@ static irqreturn_t echo_isr(int irq, void *data) {
 	} else {
 		time_start = jiffies;
 	}
-
-//	if (flag == 'n') {
-//		getnstimeofday(&start_time);
-//		start_time = current_kernel_time();
-//		flag = 's';
-//	} else {
-//		if (flag == 's') {
-//			getnstimeofday(&end_time);
-//			end_time = timespec_sub(end_time, start_time);
-//
-//			flag = 'y';
-//			wake_up_interruptible(&queue);
-//		}
-//	}
 	return IRQ_HANDLED;
 }
 
@@ -198,7 +184,7 @@ static int __init hc_sr04_init(void) /* Constructor */
 
 	trigger_timer.function = trigger_timer_func;
 	trigger_timer.data = 1L;							// initially turn LED on
-	trigger_timer.expires = jiffies + (1 * HZ);// 1 sec.
+	trigger_timer.expires = jiffies + ((1 * HZ)/10);// 1 sec.
 	add_timer(&trigger_timer);
 	return 0;// Non-zero return means that the module couldn't be loaded.
 }
