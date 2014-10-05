@@ -216,7 +216,7 @@ static void __exit hc_sr04_cleanup(void)
 		gpio_free(_Trigger[i]);
 		gpio_free(_Echo[i]);
 	}
-
+	del_timer_sync(&trigger_timer);
 	printk(KERN_INFO "hc_sr04: unregistered\n");
 }
 
