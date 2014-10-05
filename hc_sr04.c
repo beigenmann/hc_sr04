@@ -93,10 +93,10 @@ static void trigger_timer_func(unsigned long data) {
 	//printk(KERN_INFO "%s\n", __func__);
 
 	/* schedule next execution */
-	trigger_timer.expires 8= jiffies + ((1 * HZ)/10); 		// 1 sec.
+	trigger_timer.expires = jiffies + ((1 * HZ)/10); 		// 1 sec.
 	add_timer(&trigger_timer);
 }
-1
+
 /*
  * The interrupt service routine called on button presses
  */
