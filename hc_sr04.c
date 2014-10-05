@@ -93,7 +93,7 @@ static void trigger_timer_func(unsigned long data) {
 	//printk(KERN_INFO "%s\n", __func__);
 
 	/* schedule next execution */
-	trigger_timer.expires = jiffies + (1/10 * HZ); 		// 1 sec.
+	trigger_timer.expires = jiffies + (10 * HZ); 		// 1 sec.
 	add_timer(&trigger_timer);
 }
 
@@ -198,7 +198,7 @@ static int __init hc_sr04_init(void) /* Constructor */
 
 	trigger_timer.function = trigger_timer_func;
 	trigger_timer.data = 1L;							// initially turn LED on
-	trigger_timer.expires = jiffies + (1/10*HZ);// 1 sec.
+	trigger_timer.expires = jiffies + (10*HZ);// 1 sec.
 	add_timer(&trigger_timer);
 	return 0;// Non-zero return means that the module couldn't be loaded.
 }
