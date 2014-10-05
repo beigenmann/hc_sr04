@@ -44,7 +44,7 @@ module_param_array(Echo, uint, &echocount, 0);
 MODULE_PARM_DESC(Echo, "Echo" BUS_PARM_DESC);
 module_param_array(Trigger, uint, &triggercount, 0);
 MODULE_PARM_DESC(Trigger, "Trigger" BUS_PARM_DESC);
-
+static struct timer_list trigger_timer;
 static int hc_sr04_open(struct inode *i, struct file *f) {
 	printk(KERN_INFO "Driver: open()\n");
 	return 0;
@@ -84,6 +84,20 @@ static struct file_operations fops = { .owner = THIS_MODULE, .open =
 		hc_sr04_write };
 
 /*
+ * Timer function called periodically
+ */
+static void trigger_timer_func(unsigned long data) {
+	gpio_set_value(TRIGGER, HIGH);
+	udelay(10);
+	gpio_set_value(TRIGGER, LOW);
+	//printk(KERN_INFO "%s\n", __func__);
+
+	/* schedule next execution */
+	trigger_timer.expires = jiffies + (1/10 * HZ); 		// 1 sec.
+	add_timer(&trigger_timer);
+}
+
+/*
  * The interrupt service routine called on button presses
  */
 static irqreturn_t echo_isr(int irq, void *data) {
@@ -94,9 +108,9 @@ static irqreturn_t echo_isr(int irq, void *data) {
 	gpio_set_value(DEBUGPIN, LOW);
 #endif
 	value = gpio_get_value(ECHO);
-	if(value == 0){
+	if (value == 0) {
 		time_elapsed = jiffies - time_start;
-	}else{
+	} else {
 		time_start = jiffies;
 	}
 
@@ -179,7 +193,14 @@ static int __init hc_sr04_init(void) /* Constructor */
 	}
 
 	printk(KERN_INFO "hc_sr04:  registered");
-	return 0; // Non-zero return means that the module couldn't be loaded.
+	/* init timer, add timer function */
+	init_timer(&trigger_timer);
+
+	trigger_timer.function = trigger_timer_func;
+	trigger_timer.data = 1L;							// initially turn LED on
+	trigger_timer.expires = jiffies + (1/10*HZ);// 1 sec.
+	add_timer(&trigger_timer);
+	return 0;// Non-zero return means that the module couldn't be loaded.
 }
 
 static void __exit hc_sr04_cleanup(void)
