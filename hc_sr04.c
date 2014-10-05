@@ -112,6 +112,7 @@ static irqreturn_t echo_isr(int irq, void *data) {
 	if (value == 0) {
 		getrawmonotonic(&end_time);
 		time_elapsed = end_time.tv_nsec - time_start.tv_nsec;
+		time_elapsed =time_elapsed /1000;
 	} else {
 		getrawmonotonic(&time_start);
 	}
