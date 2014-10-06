@@ -8,10 +8,12 @@
 #include <linux/cdev.h>
 #include <linux/kdev_t.h>
 #include <linux/gpio.h>
-#include <linux/delay.h>
 #include <linux/interrupt.h>
 #include <linux/wait.h>
 #include <linux/sched.h>
+#include <linux/kdev_t.h>
+#include <linux/gpio.h>
+#include <linux/delay.h>
 #include <linux/jiffies.h>
 #include "hc_sr04.h"
 
@@ -56,19 +58,7 @@ static int hc_sr04_close(struct inode *i, struct file *f) {
 static ssize_t hc_sr04_read(struct file *f, char __user *buf, size_t
 		len, loff_t *off) {
 	ssize_t ret;
-//	printk(KERN_INFO "Driver: read()\n");
-//	flag = 'n';
-//	gpio_set_value(TRIGGER, HIGH);
-//	udelay(10);
-//	gpio_set_value(TRIGGER, LOW);
-//	wait_event_interruptible_timeout(queue, flag == 'y',20);
-//	printk(KERN_INFO "End Driver: read()\n");
-//	if(flag == 'y') {
-//		ret = snprintf(buf, len, "ALT %zd\n", time_elapsed);
-//	}
-//	else {
-//		ret = snprintf(buf, len, "Timed out\n");
-//	}
+	msleep(100);
 	ret = snprintf(buf, len, "ALT %zd\n", time_elapsed);
 	*off += ret;
 	return ret;
@@ -79,9 +69,27 @@ static ssize_t hc_sr04_write(struct file *f, const char __user *buf,
 	printk(KERN_INFO "Driver: write()\n");
 	return len;
 }
+
+// Show function definition.....
+static ssize_t get_time_elapsed(struct class *cls, struct class_attribute *attr,
+		char *buf) {
+	return sprintf(buf, "%li\n", time_elapsed);
+}
+// Store function definition ....
+static ssize_t set_time_elapsed(struct class *cls, struct class_attribute *attr,
+		const char *buf, size_t count) {
+	return 0;
+}
+
 static struct file_operations fops = { .owner = THIS_MODULE, .open =
 		hc_sr04_open, .release = hc_sr04_close, .read = hc_sr04_read, .write =
 		hc_sr04_write };
+
+static struct class_attribute class_attr[] = { __ATTR(time_elapsed, 0444,
+		get_time_elapsed, set_time_elapsed), __ATTR_NULL };
+
+static struct class hc_sr04_drv = { .name = "hc_sr04", .owner = THIS_MODULE,
+		.class_attrs = (struct class_attribute *) &class_attr, };
 
 /*
  * Timer function called periodically
@@ -90,10 +98,8 @@ static void trigger_timer_func(unsigned long data) {
 	gpio_set_value(TRIGGER, HIGH);
 	udelay(10);
 	gpio_set_value(TRIGGER, LOW);
-	//printk(KERN_INFO "%s\n", __func__);
-
 	/* schedule next execution */
-	trigger_timer.expires = jiffies + ((1 * HZ)/10); 		// 1 sec.
+	trigger_timer.expires = jiffies + ((1 * HZ) / 10); 		// 1 sec.
 	add_timer(&trigger_timer);
 }
 
@@ -112,7 +118,7 @@ static irqreturn_t echo_isr(int irq, void *data) {
 	if (value == 0) {
 		getrawmonotonic(&end_time);
 		time_elapsed = end_time.tv_nsec - time_start.tv_nsec;
-		time_elapsed =time_elapsed /1000;
+		time_elapsed = time_elapsed / 1000;
 	} else {
 		getrawmonotonic(&time_start);
 	}
@@ -151,6 +157,10 @@ static int __init hc_sr04_init(void) /* Constructor */
 		class_destroy(cl);
 		unregister_chrdev_region(first, 1);
 		return -1;
+	}
+	status = class_register(&hc_sr04_drv);
+	if (status < 0) {
+		printk(KERN_INFO "Registering Class Failed\n");
 	}
 #ifdef DEBUGPIN 
 	status = gpio_request_one(DEBUGPIN, GPIOF_OUT_INIT_LOW, "DEBUG");
@@ -198,6 +208,7 @@ static void __exit hc_sr04_cleanup(void)
 	cdev_del(&c_dev);
 	device_destroy(cl, first);
 	class_destroy(cl);
+	class_unregister(&hc_sr04_drv);
 	unregister_chrdev_region(first, 1);
 	for(i = 0; i <_count;i++) {
 		irq_num = gpio_to_irq(_Echo[i]);
